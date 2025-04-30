@@ -1,0 +1,129 @@
+package com.employee.demo.controller;
+
+import java.util.List;
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.domain.Page;
+import org.springframework.stereotype.Controller;
+import org.springframework.ui.Model;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.ModelAttribute;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+
+import com.employee.demo.model.Employee;
+import com.employee.demo.service.EmployeeService;
+
+
+
+@Controller
+public class EmployeeController {
+
+	@Autowired
+	private EmployeeService employeeService;
+	
+	@GetMapping("/")
+	public String viewHomePage(Model model) {
+		return findPaginated(1, "firstName", "asc", model);		
+	}
+	
+	@GetMapping("/showNewEmployeeForm")
+	public String showNewEmployeeForm(Model model) {
+		Employee employee = new Employee();
+		model.addAttribute("employee", employee);
+		return "new_employee";
+	}
+
+	@PostMapping("/saveEmployee")
+	public String saveEmployee(@ModelAttribute("employee") Employee employee, Model model) {
+	    try {
+	        if (employee.getId() == 0) {  
+	            employeeService.saveEmployee(employee);
+	        } else {
+	            employeeService.updateEmployee(employee);
+	        }
+	        return "redirect:/";  
+	    } catch (Exception e) {
+	        String message = e.getCause() != null ? e.getCause().getMessage() : e.getMessage();
+	        String cleanedMessage = "An error occurred.";
+	        int index = message.indexOf("Duplicate entry");
+	        if (index != -1) {
+	            cleanedMessage = message.substring(index);
+	        }
+
+	        model.addAttribute("errorMessage", cleanedMessage);
+	        model.addAttribute("employee", employee);
+	        return "new_employee"; 
+	    }
+	}
+	
+	@GetMapping("/showFormForUpdate/{id}")
+	public String showFormForUpdate(@PathVariable ( value = "id") long id, Model model) {
+		Employee employee = employeeService.getEmployeeById(id);
+		model.addAttribute("employee", employee);
+		return "update_employee";
+	}
+	
+	@GetMapping("/deleteEmployee/{id}")
+	public String deleteEmployee(@PathVariable (value = "id") long id) {
+		this.employeeService.deleteEmployeeById(id);
+		return "redirect:/";
+	}
+	
+	
+	@GetMapping("/page/{pageNo}")
+	public String findPaginated(@PathVariable (value = "pageNo") int pageNo, 
+			@RequestParam("sortField") String sortField,
+			@RequestParam("sortDir") String sortDir,
+			Model model) {
+		int pageSize = 5;
+		
+		Page<Employee> page = employeeService.findPaginated(pageNo, pageSize, sortField, sortDir);
+		List<Employee> listEmployees = page.getContent();
+		
+		model.addAttribute("currentPage", pageNo);
+		model.addAttribute("pageSize", page.getSize());
+		model.addAttribute("totalPages", page.getTotalPages());
+		model.addAttribute("totalItems", page.getTotalElements());
+		
+		model.addAttribute("sortField", sortField);
+		model.addAttribute("sortDir", sortDir);
+		model.addAttribute("reverseSortDir", sortDir.equals("asc") ? "desc" : "asc");
+		
+		model.addAttribute("listEmployees", listEmployees);
+		return "index";
+	}	
+	@GetMapping("/searchEmployee")
+	public String searchEmployee(@RequestParam("search") String search,
+	                             Model model) {
+
+	    List<Employee> listEmployees = employeeService.searchEmployees(search);
+
+	    model.addAttribute("listEmployees", listEmployees);
+	    model.addAttribute("searchQuery", search);
+
+	    model.addAttribute("currentPage", 1); 
+	    model.addAttribute("pageSize", listEmployees.size());
+
+	    return "index"; 
+	}
+
+	@PostMapping("/updateEmployee")
+	public String updateEmployee(@ModelAttribute("employee") Employee employee, Model model) {
+	    try {
+	        if (employee.getId() == 0) {
+	            throw new IllegalArgumentException("Invalid employee ID");
+	        }
+	        employeeService.updateEmployee(employee);
+
+	        return "redirect:/";
+	    } catch (Exception e) {
+	        model.addAttribute("errorMessage", "Failed to update employee: " + e.getMessage());
+	        return "update_employee";
+	    }
+	}
+     
+	 
+	 
+}
